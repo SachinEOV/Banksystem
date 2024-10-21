@@ -1,14 +1,19 @@
-import psycopg2
+import configparser
+from psycopg2 import connect
+
+# Load configuration from config.ini file
+config = configparser.ConfigParser()
+config.read('config.ini')
 
 class AccountManager:
     def __init__(self):
         try:
-            self.connection = psycopg2.connect(
-                database="bank_system",
-                user="postgres",
-                password="Yash@2000",  # Your PostgreSQL password
-                host="localhost",
-                port="5432"
+            self.connection = connect(
+                database=config['database']['DB_NAME'],
+                user=config['database']['DB_USER'],
+                password=config['database']['DB_PASSWORD'],
+                host=config['database']['DB_HOST'],
+                port=config['database']['DB_PORT']
             )
             self.cursor = self.connection.cursor()
             print("Database connection successful.")
@@ -30,72 +35,74 @@ class AccountManager:
     def verify_login(self, username, password):
         try:
             query = """
-            SELECT account_number FROM accounts WHERE username=%s AND password=%s;
+            SELECT account_number FROM accounts
+            WHERE username = %s AND password = %s;
             """
             self.cursor.execute(query, (username, password))
             result = self.cursor.fetchone()
-            if result:
-                return result[0]  # account_number
-            else:
-                return None
+            return result[0] if result else None
         except Exception as error:
             print("Error verifying login:", error)
+            return None
 
     def verify_pin(self, username, pin):
         try:
             query = """
-            SELECT pin FROM accounts WHERE username=%s;
+            SELECT pin FROM accounts
+            WHERE username = %s;
             """
             self.cursor.execute(query, (username,))
             result = self.cursor.fetchone()
-            if result and result[0] == pin:
-                return True
-            else:
-                return False
+            return result[0] == pin if result else False
         except Exception as error:
             print("Error verifying PIN:", error)
+            return False
 
     def change_password(self, username, new_password):
         try:
             query = """
-            UPDATE accounts SET password=%s WHERE username=%s;
+            UPDATE accounts
+            SET password = %s
+            WHERE username = %s;
             """
             self.cursor.execute(query, (new_password, username))
             self.connection.commit()
-            print("Password updated successfully.")
+            print("Password changed successfully.")
         except Exception as error:
-            print("Error updating password:", error)
+            print("Error changing password:", error)
 
     def change_pin(self, username, new_pin):
         try:
             query = """
-            UPDATE accounts SET pin=%s WHERE username=%s;
+            UPDATE accounts
+            SET pin = %s
+            WHERE username = %s;
             """
             self.cursor.execute(query, (new_pin, username))
             self.connection.commit()
-            print("PIN updated successfully.")
+            print("PIN changed successfully.")
         except Exception as error:
-            print("Error updating PIN:", error)
+            print("Error changing PIN:", error)
 
     def get_balance(self, account_number):
         try:
             query = """
-            SELECT balance FROM accounts WHERE account_number=%s;
+            SELECT balance FROM accounts
+            WHERE account_number = %s;
             """
             self.cursor.execute(query, (account_number,))
             result = self.cursor.fetchone()
-            if result:
-                return float(result[0])  # Convert Decimal to float
-            else:
-                print("Account not found.")
-                return None
+            return result[0] if result else print("Error")
         except Exception as error:
-            print("Error fetching balance:", error)
+            print("Error retrieving balance:", error)
+            return "Error re"
 
     def update_balance(self, account_number, new_balance):
         try:
             query = """
-            UPDATE accounts SET balance=%s WHERE account_number=%s;
+            UPDATE accounts
+            SET balance = %s
+            WHERE account_number = %s;
             """
             self.cursor.execute(query, (new_balance, account_number))
             self.connection.commit()
@@ -118,32 +125,18 @@ class AccountManager:
     def get_transaction_history(self, account_number):
         try:
             query = """
-            SELECT * FROM transactions WHERE account_number=%s;
+            SELECT transaction_type, amount, transaction_time FROM transactions
+            WHERE account_number = %s
+            ORDER BY transaction_time DESC;
             """
             self.cursor.execute(query, (account_number,))
-            return self.cursor.fetchall()
+            transactions = self.cursor.fetchall()
+            return transactions
         except Exception as error:
-            print("Error fetching transaction history:", error)
-
-    def create_transactions_table(self):
-        try:
-            query = """
-            CREATE TABLE IF NOT EXISTS transactions (
-                id SERIAL PRIMARY KEY,
-                account_number VARCHAR(50) NOT NULL,
-                transaction_type VARCHAR(10) NOT NULL,
-                amount DECIMAL(10, 2) NOT NULL,
-                transaction_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            """
-            self.cursor.execute(query)
-            self.connection.commit()
-            print("Transactions table created or already exists.")
-        except Exception as error:
-            print("Error creating transactions table:", error)
+            print("Error retrieving transaction history:", error)
+            return None
 
     def close(self):
-        """Close cursor and connection"""
         try:
             self.cursor.close()
             self.connection.close()
@@ -151,11 +144,6 @@ class AccountManager:
         except Exception as error:
             print("Error closing connection:", error)
 
-# Example usage
 if __name__ == "__main__":
     manager = AccountManager()
-    
-    # Create transactions table
-    manager.create_transactions_table()
-
-    # Add other functionality or menu as needed
+    manager.close()
