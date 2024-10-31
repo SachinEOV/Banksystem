@@ -16,7 +16,7 @@ class MyClientFactory(ClientFactory):
         return Client()
 
 if __name__ == "__main__":
-    endpoint = TCP4ClientEndpoint(reactor, 'localhost', 9000)
+    endpoint = TCP4ClientEndpoint(reactor, 'localhost', 9001)
     endpoint.connect(MyClientFactory())
-    print("Connecting to server on port 8007...")
+    print("Connecting to server on port 9001...")
     reactor.run()
