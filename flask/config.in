@@ -1,0 +1,11 @@
+[API_Config]
+api_version = 3.91
+accessmode = agency
+accessid = flyondo embarkingonvoyage
+session =  
+cache_control = no-cache
+authmode = pwd
+
+[Authorization]
+username = embarkingonvoyage
+password = a9684c13b7bd14c6ad1acf3c1f83636b
