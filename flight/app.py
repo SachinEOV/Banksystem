@@ -3,6 +3,7 @@ import requests
 from lxml import etree
 from flask_cors import CORS
 import config_init
+from utils import create_flight_request_xml  
 
 app = Flask(__name__)
 CORS(app)
@@ -11,12 +12,7 @@ CORS(app)
 def search_flights():
     print("Request received:")
     print(request.json)
-    data = request.json  # Receive input from the frontend
-    dep_apt = data.get("dep_apt")
-    dst_apt = data.get("dst_apt")
-    dep_date = data.get("dep_date")
-    return_date = data.get("return_date")
-    passengers = data.get("passengers", [])
+    data = request.json  
 
     headers = {
         "Authorization": config_init.authorization_header,
@@ -32,46 +28,11 @@ def search_flights():
     if not api_url:
         return jsonify({"success": False, "error": "API URL not found in config file"}), 500
 
-    fare_request = etree.Element("fareRequest", da="true")
-
-    vcrs = etree.SubElement(fare_request, "vcrs")
-    etree.SubElement(vcrs, "vcr").text = "BA"
-
-    etree.SubElement(fare_request, "fareTypes", xmlns="http://ypsilon.net/shared")
-    etree.SubElement(fare_request, "tourOps")
-
-    flights = etree.SubElement(fare_request, "flights")
-    etree.SubElement(flights, "flight", depApt=dep_apt, dstApt=dst_apt, depDate=dep_date)
-    if return_date:
-        etree.SubElement(flights, "flight", depApt=dst_apt, dstApt=dep_apt, depDate=return_date)
-
-    paxes = etree.SubElement(fare_request, "paxes")
-    for pax in passengers:
-        etree.SubElement(
-            paxes,
-            "pax",
-            surname=pax.get("surname"),
-            firstname=pax.get("firstname"),
-            dob=pax.get("dob"),
-            gender=pax.get("gender"),
-        )
-
-    etree.SubElement(fare_request, "paxTypes")
-
-    options = etree.SubElement(fare_request, "options")
-    etree.SubElement(options, "limit").text = "20"
-    etree.SubElement(options, "offset").text = "0"
-    wait_on_list = etree.SubElement(options, "waitOnList")
-    etree.SubElement(wait_on_list, "waitOn").text = "ALL"
-
-    coses = etree.SubElement(fare_request, "coses")
-    etree.SubElement(coses, "cos").text = "E"
-
-    xml_request_body = etree.tostring(fare_request, pretty_print=True, xml_declaration=True, encoding="UTF-8")
+    xml_request_body = create_flight_request_xml(data)
 
     print("API Request URL:", api_url)
     print("API Request Headers:", headers)
-    print("API Request Body:", xml_request_body.decode())  # Decode bytes to string
+    print("API Request Body:", xml_request_body.decode())
 
     try:
         response = requests.post(api_url, headers=headers, data=xml_request_body)
@@ -81,26 +42,32 @@ def search_flights():
     if response.status_code == 200:
         try:
             root = etree.fromstring(response.content)
-            print(etree.tostring(root, pretty_print=True).decode())
-            flight_info = []
+            print("Full XML Response:")
+            print(etree.tostring(root, pretty_print=True).decode())  
 
+            flight_info = []
             namespaces = {"shared": "http://ypsilon.net/shared"}
+
             for fare in root.xpath("//fare", namespaces=namespaces):
-                print("Fare Element: ", etree.tostring(fare, pretty_print=True).decode())
+                print("Fare Element:", etree.tostring(fare, pretty_print=True).decode())
+                
                 dep_apt = fare.get("depApt")
                 dst_apt = fare.get("dstApt")
                 dep_date = fare.get("date")
                 fare_id = fare.get("fareId")
                 ticket_timelimit = fare.get("ticketTimelimit")
                 class_code = fare.get("class")
+                cos = fare.get("cos")
 
+                # Append flight info
                 flight_info.append({
                     "fare_id": fare_id,
                     "departure_airport": dep_apt,
                     "destination_airport": dst_apt,
                     "departure_date": dep_date,
                     "ticket_timelimit": ticket_timelimit,
-                    "class": class_code
+                    "class": class_code,
+                    "cos": cos,
                 })
 
             return jsonify({"success": True, "flights": flight_info})
